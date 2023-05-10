@@ -24,7 +24,7 @@ class Database:
         cursor = self.connection.cursor()
         #result = cursor.execute('CREATE TABLE '+table+'(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, value TEXT);')
         result = 'CREATE TABLE IF NOT EXISTS table_tags (hash TEXT PRIMARY KEY ON CONFLICT REPLACE, path TEXT, tags TEXT );'
-        self.debug(result)
+        #self.debug(result)
         cursor.execute(result)
         self.connection.commit()
         cursor.close()
@@ -410,6 +410,10 @@ class Database:
         #print(result)
         return result
 
+# end of Class
+
+
+
 
 if  __name__ == '__main__':
 
@@ -425,14 +429,21 @@ if  __name__ == '__main__':
     start = time.time()
     # podlancza sie do wybranej bazy i wybiera table
     db = Database('tagi.db')
-    db.op_mode='debug'
+    db.op_mode='xxdebugxx'
     table = 'table_tags'
     #print(help(db))
+
+    def printerr(*args, **kwargs):
+        print(*args, file=sys.stderr, **kwargs)
     
     def get_md5sum(file):
         def file_as_bytes(file):
             with file:
                 return file.read()
+        #import pdb;pdb.set_trace()
+        if not os.path.isfile(file):
+            printerr("File not exists. Exit")
+            exit()
         return hashlib.md5(file_as_bytes(open(sys.argv[2], 'rb'))).hexdigest()
 
     command = sys.argv[1]
@@ -443,17 +454,25 @@ if  __name__ == '__main__':
     #print("tagi", tags)
     #print("hash", hash)
     #print("MODE:",command)
+    printerr()
 
     if (command == "update"):
         filepath = os.path.realpath(sys.argv[2])
         tags = sys.argv[3:]
         hash = get_md5sum(filepath)
         
-        row = {}
-        row["hash"] = hash
-        row["path"] = filepath
-        row["tags"] = ",".join(tags)
-        db.update_by_hash(table, row)
+        #import pdb;pdb.set_trace()
+        result = db.query_one(table,{'hash':hash})
+        if result:
+            row = {}
+            row["hash"] = hash
+            row["path"] = filepath
+            row["tags"] = ",".join(tags)
+            db.update_by_hash(table, row)
+        else:
+            printerr("Record not exists. Command changed to insert")
+            command = "insert"
+
     """ moge uzywac inseert za kazdym razem jako insert i jako update bodidalem ON CONFLICT REPLACE
         ale za kazdym razem jak zupdatuje w taki sposob to record id sie zmieni na wyszczy czyli jak bede
         mial tylko jeden record i zuodetuje go 3 razy komendom insert to jego id bedzie 3 zamiast 1 i
@@ -465,7 +484,7 @@ if  __name__ == '__main__':
 
     """
 
-    if  (command == "insert"):
+    if (command == "insert"):
         filepath = os.path.realpath(sys.argv[2])
         tags = sys.argv[3:]
         hash = get_md5sum(filepath)
@@ -475,21 +494,24 @@ if  __name__ == '__main__':
         row["path"] = filepath
         row["tags"] = ",".join(tags)
         #import pdb;pdb.set_trace()
-        user_id = db.insert_row(table, row)
-        print("record Nr: ",user_id)
+        record_id = db.insert_row(table, row)
+        print("record Nr: ",record_id)
     
-    if (command == "get_tags"):   # get all tags of given file
+    elif (command == "get_tags"):   # get all tags of given file
         filepath = os.path.realpath(sys.argv[2])
         hash = get_md5sum(filepath)
 
         # get tags if there are any
         result = db.query_one(table,{'hash':hash})
         #import pdb;pdb.set_trace()
-        print("hash:",result[0][0])
-        print("file:",result[0][1])
-        print("tags:",result[0][2])
+        if result:
+            print("hash:",result[0][0])
+            print("file:",result[0][1])
+            print("tags:",result[0][2])
+        
 
-    if (command == "search"):   # search files with given tag
+
+    elif (command == "search"):   # search files with given tag
         tags = sys.argv[2:]
         #import pdb;pdb.set_trace()
         where = {}
@@ -497,11 +519,11 @@ if  __name__ == '__main__':
         result = db.find_like(table,where)
         print(result)
 
-    print("operation started at:  ",datetime.fromtimestamp(start))
+    printerr("\noperation started at:  ",datetime.fromtimestamp(start))
     finish = time.time()
-    print("operation finished at: ",datetime.fromtimestamp(finish))
-    print("operation took: ",finish - start)
-    exit()
+    printerr("operation finished at: ",datetime.fromtimestamp(finish))
+    printerr("operation took: ",finish - start)
+    #exit()
     
 
 
@@ -704,7 +726,7 @@ if  __name__ == '__main__':
             run_script()
         if cc == 'b':
             blob()
-        if cc == 'x':
+        if cc == 'x' or cc == 'q':
             break
 
 
