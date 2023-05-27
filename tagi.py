@@ -138,6 +138,7 @@ class Database:
                 result = cursor.execute(result, arg)
                 result = cursor.fetchone()
                 cursor.close()
+                #import pdb;pdb.set_trace()
                 return result
             return []
         else:
@@ -285,6 +286,30 @@ class Database:
         else:
             return ('no such table',)
 
+    # Delete row from table where hash matches
+    # {col:val, col2:val, ...} AND
+    def del_by_hash(self, table, arg):
+        #import pdb;pdb.set_trace()
+        if self.check_table(table):
+            cols = self.get_cols(table)
+            keys = arg.keys()
+            xval = []
+            for col in cols:
+                if col in keys:
+                    xval.append(col+'=:'+col)
+            #if xval == []:  # nie ma takich kolumn
+            #    return
+            #xval = ' AND '.join(xval)
+            result = 'DELETE FROM '+table+' WHERE hash=:hash;'
+            self.debug(result,arg)
+            self.debug(result,arg)
+            cursor = self.connection.cursor()
+            cursor.execute(result,arg)
+            self.connection.commit()
+            cursor.close()
+        else:
+            return ('no such table',)
+    
     # Delete row from table where matches
     # {col:val, col2:val, ...} AND
     def del_row(self, table, arg):
@@ -419,10 +444,13 @@ if  __name__ == '__main__':
 
     if (len(sys.argv)<3):
         print("""\tUsage:
-                  'update' 'filepath' 'tags'
-                  'insert' 'filepath' 'tags'
+                  'update' '/path/to/file' 'tags'
+                  'insert' '/path/to/file' 'tags'
                   'search' 'tags'
                   'get_tags' 'file'
+                  'update_path' '/path/to/file'
+                  'remove' '/path/to/file'
+                  'show_all' 'cos'
               """)
         exit()
 
@@ -436,15 +464,18 @@ if  __name__ == '__main__':
     def printerr(*args, **kwargs):
         print(*args, file=sys.stderr, **kwargs)
     
+    def show_result(result):
+        for row in result:
+            print(row)
+    
     def get_md5sum(file):
         def file_as_bytes(file):
             with file:
                 return file.read()
-        #import pdb;pdb.set_trace()
         if not os.path.isfile(file):
             printerr("File not exists. Exit")
             exit()
-        return hashlib.md5(file_as_bytes(open(sys.argv[2], 'rb'))).hexdigest()
+        return hashlib.md5(file_as_bytes(open(file, 'rb'))).hexdigest()
 
     command = sys.argv[1]
     #filepath = os.path.realpath(sys.argv[2])
@@ -456,22 +487,35 @@ if  __name__ == '__main__':
     #print("MODE:",command)
     printerr()
 
-    if (command == "update"):
-        filepath = os.path.realpath(sys.argv[2])
-        tags = sys.argv[3:]
-        hash = get_md5sum(filepath)
-        
-        #import pdb;pdb.set_trace()
+    def update_path():
+        newpath = os.path.realpath(sys.argv[2])
+        hash = get_md5sum(newpath)
         result = db.query_one(table,{'hash':hash})
         if result:
             row = {}
             row["hash"] = hash
-            row["path"] = filepath
-            row["tags"] = ",".join(tags)
+            row["path"] = newpath
+            db.update_by_hash(table, row)
+            printerr("Updated path", newpath)
+        else:
+            printerr("Record not exists. No need to update path")
+
+    def insert_or_update():
+        filepath = os.path.realpath(sys.argv[2])
+        tags = sys.argv[3:]
+        hash = get_md5sum(filepath)
+        row = {}
+        row["hash"] = hash
+        row["path"] = filepath
+        row["tags"] = ",".join(tags)
+        result = db.query_one(table,{'hash':hash})
+        if result:
+            printerr("Record exists. Do update")
             db.update_by_hash(table, row)
         else:
-            printerr("Record not exists. Command changed to insert")
-            command = "insert"
+            printerr("Record not exists. Do insert")
+            record_id = db.insert_row(table, row)
+            printerr("New record added #", record_id)
 
     """ moge uzywac inseert za kazdym razem jako insert i jako update bodidalem ON CONFLICT REPLACE
         ale za kazdym razem jak zupdatuje w taki sposob to record id sie zmieni na wyszczy czyli jak bede
@@ -484,47 +528,54 @@ if  __name__ == '__main__':
 
     """
 
-    if (command == "insert"):
-        filepath = os.path.realpath(sys.argv[2])
-        tags = sys.argv[3:]
-        hash = get_md5sum(filepath)
-        
-        row = {}
-        row["hash"] = hash
-        row["path"] = filepath
-        row["tags"] = ",".join(tags)
-        #import pdb;pdb.set_trace()
-        record_id = db.insert_row(table, row)
-        print("record Nr: ",record_id)
-    
-    elif (command == "get_tags"):   # get all tags of given file
+    def get_tags():   # get all tags of given file
         filepath = os.path.realpath(sys.argv[2])
         hash = get_md5sum(filepath)
-
         # get tags if there are any
-        result = db.query_one(table,{'hash':hash})
         #import pdb;pdb.set_trace()
+        result = db.query_one(table,{'hash':hash})
         if result:
             print("hash:",result[0][0])
             print("file:",result[0][1])
             print("tags:",result[0][2])
-        
 
-
-    elif (command == "search"):   # search files with given tag
+    def search():   # search files with given tag
         tags = sys.argv[2:]
         #import pdb;pdb.set_trace()
         where = {}
         where["tags"] = tags[0]
         result = db.find_like(table,where)
-        print(result)
+        show_result(result)
+        
+    def remove():
+        filepath = os.path.realpath(sys.argv[2])
+        hash = get_md5sum(filepath)
+        db.del_by_hash(table,{'hash':hash})
+        # nie wazne czy rekord istnieje nie bedzie errora ani rezultatu
 
+    if (command == "update"):
+        insert_or_update()
+    elif (command == "insert"):
+        insert_or_update()
+    elif (command == "get_tags"):
+        get_tags()
+    elif (command == "search"):
+        search()
+    elif (command == "update_path"):
+        update_path()
+    elif (command == "remove"):
+        remove()
+    elif (command == "show_all"):
+        result = db.query_all(table)
+        show_result(result)
+    
     printerr("\noperation started at:  ",datetime.fromtimestamp(start))
     finish = time.time()
     printerr("operation finished at: ",datetime.fromtimestamp(finish))
     printerr("operation took: ",finish - start)
-    #exit()
-    
+    exit()
+
+
 
 
 
