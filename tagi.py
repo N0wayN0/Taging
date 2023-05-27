@@ -151,20 +151,33 @@ class Database:
             keys = arg.keys()
             xval = {} 
             #import pdb;pdb.set_trace()
-            for col in cols:
-                if col in keys:
-                    xval[col] = '%' +arg[col] +'%'
-                    result  = col+ ' LIKE :' +col+ ';'
-                    cursor = self.connection.cursor()
-                    result = 'SELECT * FROM '+table+' WHERE '+result
-                    #result = 'SELECT * FROM '+table+' WHERE title LIKE :title;'
-                    self.debug(result,xval)
-                    #import pdb;pdb.set_trace()
-                    result = cursor.execute(result, xval)
-                    result = cursor.fetchall()
-                    cursor.close()
-                    return result
-            return []
+            tags = arg['tags']
+            result = ""
+            for tag in tags:
+                if tag == "OR":
+                    result = result+" OR "
+                elif tag == "AND":
+                    result = result+" AND "
+                else:
+                    printerr("Search:",tag)
+                    result = result + 'tags LIKE :'+tag.replace(" ","_")
+                    xval[tag.replace(" ","_")] = "%"+tag+"%"
+            result = result+";"
+            import pdb;pdb.set_trace()
+            #ala = "%" + "%".join(arg['tags']) + "%"
+            #xval['tags'] = '%' +arg[col] +'%'
+            #xval['tags'] = "%plik%"
+            #xval['dwa'] = "%siema%"
+            #result  = 'tags LIKE :tags OR tags LIKE :dwa;'
+            cursor = self.connection.cursor()
+            result = 'SELECT * FROM '+table+' WHERE '+result
+            #result = 'SELECT * FROM '+table+' WHERE title LIKE :title;'
+            self.debug(result,xval)
+            #import pdb;pdb.set_trace()
+            result = cursor.execute(result, xval)
+            result = cursor.fetchall()
+            cursor.close()
+            return result
         else:
             return ('no such table',)
     
@@ -446,7 +459,7 @@ if  __name__ == '__main__':
         print("""\tUsage:
                   'update' '/path/to/file' 'tags'
                   'insert' '/path/to/file' 'tags'
-                  'search' 'tags'
+                  'search' tag OR tag2 OR 'tag 3' AND tag4
                   'get_tags' 'file'
                   'update_path' '/path/to/file'
                   'remove' '/path/to/file'
@@ -488,17 +501,17 @@ if  __name__ == '__main__':
     printerr()
 
     def update_path():
-        newpath = os.path.realpath(sys.argv[2])
-        hash = get_md5sum(newpath)
+        filepath = os.path.realpath(sys.argv[2])
+        hash = get_md5sum(filepath)
         result = db.query_one(table,{'hash':hash})
         if result:
             row = {}
             row["hash"] = hash
-            row["path"] = newpath
+            row["path"] = filepath
             db.update_by_hash(table, row)
-            printerr("Updated path", newpath)
+            printerr("Updated path", filepath)
         else:
-            printerr("Record not exists. No need to update path")
+            printerr("Record not exists. No need to update path", filepath)
 
     def insert_or_update():
         filepath = os.path.realpath(sys.argv[2])
@@ -510,12 +523,12 @@ if  __name__ == '__main__':
         row["tags"] = ",".join(tags)
         result = db.query_one(table,{'hash':hash})
         if result:
-            printerr("Record exists. Do update")
+            printerr("Record exists. Do update", filepath)
             db.update_by_hash(table, row)
         else:
             printerr("Record not exists. Do insert")
             record_id = db.insert_row(table, row)
-            printerr("New record added #", record_id)
+            printerr("New record added #", record_id, filepath)
 
     """ moge uzywac inseert za kazdym razem jako insert i jako update bodidalem ON CONFLICT REPLACE
         ale za kazdym razem jak zupdatuje w taki sposob to record id sie zmieni na wyszczy czyli jak bede
@@ -528,10 +541,10 @@ if  __name__ == '__main__':
 
     """
 
-    def get_tags():   # get all tags of given file
+    #get tags of given file
+    def get_tags():
         filepath = os.path.realpath(sys.argv[2])
         hash = get_md5sum(filepath)
-        # get tags if there are any
         #import pdb;pdb.set_trace()
         result = db.query_one(table,{'hash':hash})
         if result:
@@ -539,11 +552,12 @@ if  __name__ == '__main__':
             print("file:",result[0][1])
             print("tags:",result[0][2])
 
-    def search():   # search files with given tag
+    #search files with given tag
+    def search():
         tags = sys.argv[2:]
         #import pdb;pdb.set_trace()
         where = {}
-        where["tags"] = tags[0]
+        where["tags"] = tags #[0]
         result = db.find_like(table,where)
         show_result(result)
         
