@@ -1,9 +1,11 @@
 #!/bin/python3
 
 
-""" Obsluguje baze danych
+""" taging system
     
     """
+
+database_here = "/root/sources/Taging/tagi.db"
 import os
 import sys
 import hashlib
@@ -144,6 +146,42 @@ class Database:
         else:
             return ('no such table',)
 
+    def find_in_path(self, table, arg=()):
+        if self.check_table(table):
+            cols = self.get_cols(table)
+            keys = arg.keys()
+            xval = {} 
+            #import pdb;pdb.set_trace()
+            path = arg['file'][0]
+            result = 'path LIKE :path'
+            #for tag in path:
+            #    if tag == "OR":
+            #        result = result+" OR "
+            #    elif tag == "AND":
+            #        result = result+" AND "
+            #    else:
+            printerr("Search:",path)
+            #        result = result + 'tags LIKE :'+tag.replace(" ","_")
+            xval["path"] = "%"+path+"%"
+            result = result+";"
+            #import pdb;pdb.set_trace()
+            #ala = "%" + "%".join(arg['tags']) + "%"
+            #xval['tags'] = '%' +arg[col] +'%'
+            #xval['tags'] = "%plik%"
+            #xval['dwa'] = "%siema%"
+            #result  = 'tags LIKE :tags OR tags LIKE :dwa;'
+            cursor = self.connection.cursor()
+            result = 'SELECT * FROM '+table+' WHERE '+result
+            #result = 'SELECT * FROM '+table+' WHERE title LIKE :title;'
+            self.debug(result,xval)
+            #import pdb;pdb.set_trace()
+            result = cursor.execute(result, xval)
+            result = cursor.fetchall()
+            cursor.close()
+            return result
+        else:
+            return ('no such table',)
+    
     # Find column containing text
     def find_like(self, table, arg=()):
         if self.check_table(table):
@@ -158,12 +196,14 @@ class Database:
                     result = result+" OR "
                 elif tag == "AND":
                     result = result+" AND "
+                elif tag == "NOT":
+                    result = result+" AND NOT "
                 else:
                     printerr("Search:",tag)
                     result = result + 'tags LIKE :'+tag.replace(" ","_")
                     xval[tag.replace(" ","_")] = "%"+tag+"%"
             result = result+";"
-            import pdb;pdb.set_trace()
+            #import pdb;pdb.set_trace()
             #ala = "%" + "%".join(arg['tags']) + "%"
             #xval['tags'] = '%' +arg[col] +'%'
             #xval['tags'] = "%plik%"
@@ -459,7 +499,10 @@ if  __name__ == '__main__':
         print("""\tUsage:
                   'update' '/path/to/file' 'tags'
                   'insert' '/path/to/file' 'tags'
+                  'add' '/path/to/file' 'tags'
                   'search' tag OR tag2 OR 'tag 3' AND tag4
+                  'in_path' 'cos'
+                  'stat_dir' full_path
                   'get_tags' 'file'
                   'update_path' '/path/to/file'
                   'remove' '/path/to/file'
@@ -469,7 +512,7 @@ if  __name__ == '__main__':
 
     start = time.time()
     # podlancza sie do wybranej bazy i wybiera table
-    db = Database('tagi.db')
+    db = Database(database_here)
     db.op_mode='xxdebugxx'
     table = 'table_tags'
     #print(help(db))
@@ -483,6 +526,7 @@ if  __name__ == '__main__':
     
     def get_md5sum(file):
         def file_as_bytes(file):
+            #print(file)
             with file:
                 return file.read()
         if not os.path.isfile(file):
@@ -501,34 +545,50 @@ if  __name__ == '__main__':
     printerr()
 
     def update_path():
-        filepath = os.path.realpath(sys.argv[2])
-        hash = get_md5sum(filepath)
-        result = db.query_one(table,{'hash':hash})
-        if result:
-            row = {}
-            row["hash"] = hash
-            row["path"] = filepath
-            db.update_by_hash(table, row)
-            printerr("Updated path", filepath)
-        else:
-            printerr("Record not exists. No need to update path", filepath)
+        files = sys.argv[2:]
+        for plik in files:
+            filepath = os.path.realpath(plik)
+            hash = get_md5sum(filepath)
+            result = db.query_one(table,{'hash':hash})
+            #import pdb;pdb.set_trace()
+            if result:
+                if result[0][1] != filepath:
+                    #import pdb;pdb.set_trace()
+                    row = {}
+                    row["hash"] = hash          # potrzeby do znalezienia rekordu
+                    row["path"] = filepath      # nowa sciezka
+                    db.update_by_hash(table, row)   # tagi zostana nie zmienione
+                    printerr("Old path", result[0][1])
+                    printerr("Updated path", filepath)
 
-    def insert_or_update():
+    def insert_update_add():
         filepath = os.path.realpath(sys.argv[2])
         tags = sys.argv[3:]
         hash = get_md5sum(filepath)
+        #import pdb;pdb.set_trace()
+        tags = ",".join(tags)
+        tags = tags.replace(".",",")
+        tags = tags.replace(" ,",",")
+        tags = tags.replace(", ",",")
+        tags = tags.replace(",,",",")
         row = {}
         row["hash"] = hash
         row["path"] = filepath
-        row["tags"] = ",".join(tags)
+        row["tags"] = tags
         result = db.query_one(table,{'hash':hash})
         if result:
-            printerr("Record exists. Do update", filepath)
+            printerr("Record exists", filepath, result[0][2]) #.split(','))
+            if command == "add":
+                printerr("Adding tags", tags)
+                row["tags"] =result[0][2]+","+row["tags"]
+            else:
+                printerr("Do update", tags)
             db.update_by_hash(table, row)
         else:
             printerr("Record not exists. Do insert")
             record_id = db.insert_row(table, row)
             printerr("New record added #", record_id, filepath)
+            printerr("Tags", tags)
 
     """ moge uzywac inseert za kazdym razem jako insert i jako update bodidalem ON CONFLICT REPLACE
         ale za kazdym razem jak zupdatuje w taki sposob to record id sie zmieni na wyszczy czyli jak bede
@@ -548,9 +608,33 @@ if  __name__ == '__main__':
         #import pdb;pdb.set_trace()
         result = db.query_one(table,{'hash':hash})
         if result:
-            print("hash:",result[0][0])
-            print("file:",result[0][1])
-            print("tags:",result[0][2])
+            #print("hash:",result[0][0])
+            #print("file:",result[0][1])
+            #print("tags:",result[0][2])
+            print(result[0][2])
+
+    def get_by_path(mode):
+        #import pdb;pdb.set_trace()
+        path = sys.argv[2:]
+        where = {}
+        where["file"] = path
+        result = db.find_in_path(table,where)
+        if ( mode == "stat_dir"):
+            all_files = os.listdir(path[0])
+            print("\n All taged files in: ", path )
+            for row in result:
+                name = os.path.basename(row[1])
+                print(name,"\t",row[2])
+                if (name in all_files):
+                    #import pdb;pdb.set_trace()
+                    all_files.remove(name)
+            print("\n Not listed files:")
+            for plik in all_files:
+                print(plik)
+
+        else:    # search in path
+            for row in result:
+                print(row[1])
 
     #search files with given tag
     def search():
@@ -559,7 +643,9 @@ if  __name__ == '__main__':
         where = {}
         where["tags"] = tags #[0]
         result = db.find_like(table,where)
-        show_result(result)
+        #show_result(result)
+        for row in result:
+            print(row[1])
         
     def remove():
         filepath = os.path.realpath(sys.argv[2])
@@ -568,9 +654,11 @@ if  __name__ == '__main__':
         # nie wazne czy rekord istnieje nie bedzie errora ani rezultatu
 
     if (command == "update"):
-        insert_or_update()
+        insert_update_add()
     elif (command == "insert"):
-        insert_or_update()
+        insert_update_add()
+    elif (command == "add"):
+        insert_update_add()
     elif (command == "get_tags"):
         get_tags()
     elif (command == "search"):
@@ -579,6 +667,10 @@ if  __name__ == '__main__':
         update_path()
     elif (command == "remove"):
         remove()
+    elif (command == "in_path"):
+        get_by_path("in_path")
+    elif (command == "stat_dir"):
+        get_by_path("stat_dir")
     elif (command == "show_all"):
         result = db.query_all(table)
         show_result(result)
