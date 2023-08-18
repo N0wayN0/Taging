@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# this script show all taged and not taged files in given directory
+
 if [ !$1 ] 
  then
     dir="$PWD"

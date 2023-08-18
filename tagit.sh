@@ -1,5 +1,6 @@
 #!/bin/sh
 
+# it will add same set of tags to the files specified in selection-1
 
 lista=selection-1
 while read line

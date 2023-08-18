@@ -20,7 +20,7 @@ Usage:
     Show all files with given tags:
     $ search tag1 AND "tag 2" OR tag3
     
-    Search for 'word' in path name
+    Search for 'word' in path name:
     $ in_path word 
 
     Get all tags of given file:
