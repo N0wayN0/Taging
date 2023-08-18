@@ -4,6 +4,7 @@ Taging System
 Usage:
     
 ##Add Update and rewrite tags
+
     Write new sets of tags;
     $ update /path/to/file tag1 tag2 tag3 "tag 4"
 
@@ -15,6 +16,7 @@ Usage:
     
     
 ##Search
+
     Show all files with given tags:
     $ search tag1 AND "tag 2" OR tag3
     
@@ -26,6 +28,7 @@ Usage:
 
 
 ##Maintain
+
     Shows wchich files are taged in given directory:
     $ stat_dir /path/to/dir
     
