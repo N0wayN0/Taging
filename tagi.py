@@ -119,30 +119,33 @@ class Database:
         else:
             return ('no such table',)
     
-    # Returns first row matching criteria
-    # {col:val, ...} AND
-    def query_first(self, table, arg=()):
+    # Selact all tags from table and show uniqe only
+    def get_all_tags(self, table):
         if self.check_table(table):
             #import pdb;pdb.set_trace()
             cols = self.get_cols(table)
-            keys = arg.keys()
-            xval = []
-            for col in cols:
-                if col in keys:
-                    xval.append(col+'=:'+col)
-            xval = ' AND '.join(xval)
-            if xval:
-                cursor = self.connection.cursor()
-                result = 'SELECT * FROM '+table+' WHERE '+xval+';'
-                self.debug(result,arg)
-                #print(result,arg)
-                cursor.row_factory = sqlite3.Row
-                result = cursor.execute(result, arg)
-                result = cursor.fetchone()
-                cursor.close()
-                #import pdb;pdb.set_trace()
-                return result
-            return []
+            cursor = self.connection.cursor()
+            result = 'SELECT * FROM '+table+';'
+            
+            #to tylko do testu zeby buylo szybko
+            #xval = {} 
+            #xval['doggy'] = "%doggy%"
+            #xval['fpv'] = "%fpv%"
+            #result = 'SELECT * FROM table_tags WHERE tags LIKE :doggy AND tags LIKE :fpv;'
+            #import pdb;pdb.set_trace()
+            result = cursor.execute(result) #,xval)   #xval nie potrzebne
+            global_tags = []
+            while (result):
+                result = cursor.fetchmany(30)
+                for row in result:
+                    row_tags = row[2].split(',')
+                    global_tags += row_tags
+            cursor.close()
+            #import pdb;pdb.set_trace()
+            result = set(global_tags)
+            printerr("ALL tags:",len(global_tags))
+            printerr("Unique tags:",len(result))
+            return result
         else:
             return ('no such table',)
 
@@ -152,7 +155,7 @@ class Database:
             keys = arg.keys()
             xval = {} 
             #import pdb;pdb.set_trace()
-            path = arg['file'][0]
+            path = arg['file']#[0]
             result = 'path LIKE :path'
             #for tag in path:
             #    if tag == "OR":
@@ -160,7 +163,7 @@ class Database:
             #    elif tag == "AND":
             #        result = result+" AND "
             #    else:
-            printerr("Search:",path)
+            printerr("Search in:", path)
             #        result = result + 'tags LIKE :'+tag.replace(" ","_")
             xval["path"] = "%"+path+"%"
             result = result+";"
@@ -341,7 +344,7 @@ class Database:
 
     # Delete row from table where hash matches
     # {col:val, col2:val, ...} AND
-    def del_by_hash(self, table, arg):
+    def del_by_path(self, table, arg):
         #import pdb;pdb.set_trace()
         if self.check_table(table):
             cols = self.get_cols(table)
@@ -353,7 +356,7 @@ class Database:
             #if xval == []:  # nie ma takich kolumn
             #    return
             #xval = ' AND '.join(xval)
-            result = 'DELETE FROM '+table+' WHERE hash=:hash;'
+            result = 'DELETE FROM '+table+' WHERE path=:path;'
             self.debug(result,arg)
             self.debug(result,arg)
             cursor = self.connection.cursor()
@@ -613,23 +616,35 @@ if  __name__ == '__main__':
             #print("tags:",result[0][2])
             print(result[0][2])
 
+    #get all tags from database
+    def get_my_tags():
+        result = db.get_all_tags(table)
+        if result:
+            for tag in result:
+                print(tag)
+
     def get_by_path(mode):
-        #import pdb;pdb.set_trace()
         path = sys.argv[2:]
         where = {}
+        #import pdb;pdb.set_trace()
+        path = os.path.realpath(path[0])
         where["file"] = path
-        result = db.find_in_path(table,where)
+        result = db.find_in_path(table,where)   # all files in all subdirectories
         if ( mode == "stat_dir"):
-            all_files = os.listdir(path[0])
-            print("\n All taged files in: ", path )
+            all_files_in_dir = os.listdir(path)
+            print("\n All taged files in: ", path)
             for row in result:
                 name = os.path.basename(row[1])
-                print(name,"\t",row[2])
-                if (name in all_files):
+                if (name in all_files_in_dir):
+                    print(name,"\t",row[2])
                     #import pdb;pdb.set_trace()
-                    all_files.remove(name)
+                    all_files_in_dir.remove(name)
             print("\n Not listed files:")
-            for plik in all_files:
+            for plik in all_files_in_dir:
+                #import pdb;pdb.set_trace()
+                filepath = os.path.realpath(path+plik)
+                if (filepath):
+                    plik+="/"
                 print(plik)
 
         else:    # search in path
@@ -649,8 +664,7 @@ if  __name__ == '__main__':
         
     def remove():
         filepath = os.path.realpath(sys.argv[2])
-        hash = get_md5sum(filepath)
-        db.del_by_hash(table,{'hash':hash})
+        db.del_by_path(table,{'path':filepath})
         # nie wazne czy rekord istnieje nie bedzie errora ani rezultatu
 
     if (command == "update"):
@@ -671,6 +685,8 @@ if  __name__ == '__main__':
         get_by_path("in_path")
     elif (command == "stat_dir"):
         get_by_path("stat_dir")
+    elif (command == "my_tags"):
+        get_my_tags()
     elif (command == "show_all"):
         result = db.query_all(table)
         show_result(result)
