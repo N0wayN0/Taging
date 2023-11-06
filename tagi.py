@@ -498,21 +498,25 @@ class Database:
 
 if  __name__ == '__main__':
 
-    if (len(sys.argv)<3):
+    def print_usage():
+        #import pdb;pdb.set_trace()
         print("""\tUsage:
-                  'update' '/path/to/file' 'tags'
-                  'insert' '/path/to/file' 'tags'
-                  'add' '/path/to/file' 'tags'
-                  'search' tag OR tag2 OR 'tag 3' AND tag4
-                  'in_path' 'cos'
-                  'stat_dir' full_path
-                  'get_tags' 'file'
+                  'update'  '/path/to/file' tag1 tag2 'tag 3'
+                  'insert'  '/path/to/file' tag1 tag2 'tag 3'
+                  'add'     '/path/to/file' tag1 tag2 'tag 3'
+                  'search'  tag OR tag2 OR 'tag 3' AND tag4
+                  'in_path' keyword
+                  'stat_dir' '/path/to/filer'
+                  'get_tags' '/path/to/file'
                   'update_path' '/path/to/file'
                   'remove' '/path/to/file'
-                  'show_all' 'cos'
+                  'show_all
+                  'my_tags'
               """)
         exit()
 
+    if (len(sys.argv) <= 1 ): print_usage()
+    
     start = time.time()
     # podlancza sie do wybranej bazy i wybiera table
     db = Database(database_here)
@@ -533,6 +537,7 @@ if  __name__ == '__main__':
             with file:
                 return file.read()
         if not os.path.isfile(file):
+            import pdb;pdb.set_trace()
             printerr("File not exists. Exit")
             exit()
         return hashlib.md5(file_as_bytes(open(file, 'rb'))).hexdigest()
@@ -546,12 +551,28 @@ if  __name__ == '__main__':
     #print("hash", hash)
     #print("MODE:",command)
     printerr()
+    
+    def clean_tags(tags): 
+        #import pdb;pdb.set_trace()
+        tags = tags.replace(".",",")
+        tags = tags.replace(" ,",",")
+        tags = tags.replace(", ",",")
+        tags = tags.replace(",,",",")
+        while tags.startswith(" "):
+            tags = tags[1:]
+        while tags.endswith(","):
+            tags = tags[:-1]
+        # pop,firct i sprawdz czy istnieje i dodaj jesli nie
+        return tags
 
     def update_path():
+        if (len(sys.argv) <= 2 ): print_usage()
         files = sys.argv[2:]
+        files = files[0].split("\n")
         for plik in files:
             filepath = os.path.realpath(plik)
             hash = get_md5sum(filepath)
+            #printerr("-->",hash,filepath)
             result = db.query_one(table,{'hash':hash})
             #import pdb;pdb.set_trace()
             if result:
@@ -565,15 +586,13 @@ if  __name__ == '__main__':
                     printerr("Updated path", filepath)
 
     def insert_update_add():
+        #import pdb;pdb.set_trace()
+        if (len(sys.argv) <= 3 ): print_usage()
         filepath = os.path.realpath(sys.argv[2])
         tags = sys.argv[3:]
         hash = get_md5sum(filepath)
         #import pdb;pdb.set_trace()
         tags = ",".join(tags)
-        tags = tags.replace(".",",")
-        tags = tags.replace(" ,",",")
-        tags = tags.replace(", ",",")
-        tags = tags.replace(",,",",")
         row = {}
         row["hash"] = hash
         row["path"] = filepath
@@ -583,12 +602,15 @@ if  __name__ == '__main__':
             printerr("Record exists", filepath, result[0][2]) #.split(','))
             if command == "add":
                 printerr("Adding tags", tags)
-                row["tags"] =result[0][2]+","+row["tags"]
+                row["tags"] = result[0][2]+","+row["tags"]
+                row['tags'] = clean_tags(row['tags'])
             else:
                 printerr("Do update", tags)
+            row['tags'] = clean_tags(row['tags'])
             db.update_by_hash(table, row)
         else:
             printerr("Record not exists. Do insert")
+            row['tags'] = clean_tags(row['tags'])
             record_id = db.insert_row(table, row)
             printerr("New record added #", record_id, filepath)
             printerr("Tags", tags)
@@ -606,6 +628,7 @@ if  __name__ == '__main__':
 
     #get tags of given file
     def get_tags():
+        if (len(sys.argv) <= 2 ): print_usage()
         filepath = os.path.realpath(sys.argv[2])
         hash = get_md5sum(filepath)
         #import pdb;pdb.set_trace()
@@ -624,35 +647,37 @@ if  __name__ == '__main__':
                 print(tag)
 
     def get_by_path(mode):
+        if (len(sys.argv) <= 2 ): print_usage()
         path = sys.argv[2:]
         where = {}
         #import pdb;pdb.set_trace()
-        path = os.path.realpath(path[0])
-        where["file"] = path
-        result = db.find_in_path(table,where)   # all files in all subdirectories
         if ( mode == "stat_dir"):
+            path = os.path.realpath(path[0])
+            where["file"] = path
+            result = db.find_in_path(table,where)   # all files in all subdirectories
             all_files_in_dir = os.listdir(path)
             print("\n All taged files in: ", path)
             for row in result:
                 name = os.path.basename(row[1])
                 if (name in all_files_in_dir):
                     print(name,"\t",row[2])
-                    #import pdb;pdb.set_trace()
                     all_files_in_dir.remove(name)
             print("\n Not listed files:")
             for plik in all_files_in_dir:
-                #import pdb;pdb.set_trace()
                 filepath = os.path.realpath(path+plik)
                 if (filepath):
                     plik+="/"
                 print(plik)
 
-        else:    # search in path
+        else:    # search for keyword in path
+            where["file"] = path[0]
+            result = db.find_in_path(table,where)   # all files in all subdirectories
             for row in result:
                 print(row[1])
 
     #search files with given tag
     def search():
+        if (len(sys.argv) <= 2 ): print_usage()
         tags = sys.argv[2:]
         #import pdb;pdb.set_trace()
         where = {}
@@ -663,6 +688,7 @@ if  __name__ == '__main__':
             print(row[1])
         
     def remove():
+        if (len(sys.argv) <= 2 ): print_usage()
         filepath = os.path.realpath(sys.argv[2])
         db.del_by_path(table,{'path':filepath})
         # nie wazne czy rekord istnieje nie bedzie errora ani rezultatu
@@ -690,6 +716,8 @@ if  __name__ == '__main__':
     elif (command == "show_all"):
         result = db.query_all(table)
         show_result(result)
+
+    else: print("No.Such command", sys.argv[1]); exit()
     
     printerr("\noperation started at:  ",datetime.fromtimestamp(start))
     finish = time.time()

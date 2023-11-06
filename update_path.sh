@@ -12,6 +12,9 @@ else
     dir="$1"
 fi
 
-list=$(find "$dir" -maxdepth 1 -type f | xargs realpath)
+list=$(find "$dir" -maxdepth 1 -type f  ) # | xargs realpath)
+#list=echo "$list" | tr "\n" " "
+#echo "$list" 
+
 tagi.py update_path "$list"
 
