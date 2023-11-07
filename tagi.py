@@ -143,9 +143,14 @@ class Database:
             cursor.close()
             #import pdb;pdb.set_trace()
             result = set(global_tags)
+            result = list(result)
+            result.sort()
+            #for tag in result:
+            #    print("|"+tag+"|")
+            print(result)
+            printerr("-------------------- STATUS --------------------")
             printerr("ALL tags:",len(global_tags))
             printerr("Unique tags:",len(result))
-            return result
         else:
             return ('no such table',)
 
@@ -203,8 +208,8 @@ class Database:
                     result = result+" AND NOT "
                 else:
                     printerr("Search:",tag)
-                    result = result + 'tags LIKE :'+tag.replace(" ","_")
-                    xval[tag.replace(" ","_")] = "%"+tag+"%"
+                    result = result + 'tags LIKE :'+tag.replace(" ","_").replace(",","_")
+                    xval[tag.replace(" ","_").replace(",","_")] = "%"+tag+"%"
             result = result+";"
             #import pdb;pdb.set_trace()
             #ala = "%" + "%".join(arg['tags']) + "%"
@@ -214,8 +219,7 @@ class Database:
             #result  = 'tags LIKE :tags OR tags LIKE :dwa;'
             cursor = self.connection.cursor()
             result = 'SELECT * FROM '+table+' WHERE '+result
-            #result = 'SELECT * FROM '+table+' WHERE title LIKE :title;'
-            self.debug(result,xval)
+            #self.debug(result,xval)
             #import pdb;pdb.set_trace()
             result = cursor.execute(result, xval)
             result = cursor.fetchall()
@@ -639,13 +643,6 @@ if  __name__ == '__main__':
             #print("tags:",result[0][2])
             print(result[0][2])
 
-    #get all tags from database
-    def get_my_tags():
-        result = db.get_all_tags(table)
-        if result:
-            for tag in result:
-                print(tag)
-
     def get_by_path(mode):
         if (len(sys.argv) <= 2 ): print_usage()
         path = sys.argv[2:]
@@ -712,7 +709,7 @@ if  __name__ == '__main__':
     elif (command == "stat_dir"):
         get_by_path("stat_dir")
     elif (command == "my_tags"):
-        get_my_tags()
+        db.get_all_tags(table)
     elif (command == "show_all"):
         result = db.query_all(table)
         show_result(result)
