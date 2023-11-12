@@ -35,8 +35,12 @@ Usage:
     If file was moved this will update its path:
     $ update_path /path/to/file
 
-    Remove tags of given file:
+    Remove record of given file:
     $ remove /path/to/file
     
     Shows all records in database:
-    $ show_all spare
+    $ show_all
+
+    Shows all tags and count them:
+    $ status
+

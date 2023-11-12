@@ -129,7 +129,7 @@ class Database:
             
             #to tylko do testu zeby buylo szybko
             #xval = {} 
-            #xval['doggy'] = "%doggy%"
+            #xval['dog'] = "%dog%"
             #xval['fpv'] = "%fpv%"
             #result = 'SELECT * FROM table_tags WHERE tags LIKE :doggy AND tags LIKE :fpv;'
             #import pdb;pdb.set_trace()
@@ -141,16 +141,21 @@ class Database:
                     row_tags = row[2].split(',')
                     global_tags += row_tags
             cursor.close()
+            
+            all_tags = len(global_tags)
+            numbers = {}
+            while global_tags:
+                tag = global_tags[0]
+                if tag not in numbers.keys():
+                    numbers[tag] = global_tags.count(tag)
+                global_tags.pop(0)
+
+            result = {key: value for key, value in sorted(numbers.items())}
             #import pdb;pdb.set_trace()
-            result = set(global_tags)
-            result = list(result)
-            result.sort()
-            #for tag in result:
-            #    print("|"+tag+"|")
             print(result)
-            printerr("-------------------- STATUS --------------------")
-            printerr("ALL tags:",len(global_tags))
-            printerr("Unique tags:",len(result))
+            print("--------------------- STATUS ---------------------")
+            print("ALL tags:",all_tags)
+            print("Unique tags:",len(result))
         else:
             return ('no such table',)
 
@@ -510,12 +515,12 @@ if  __name__ == '__main__':
                   'add'     '/path/to/file' tag1 tag2 'tag 3'
                   'search'  tag OR tag2 OR 'tag 3' AND tag4
                   'in_path' keyword
-                  'stat_dir' '/path/to/filer'
+                  'stat_dir' '/path/to/dir'
                   'get_tags' '/path/to/file'
                   'update_path' '/path/to/file'
-                  'remove' '/path/to/file'
-                  'show_all
-                  'my_tags'
+                  'remove'  '/path/to/file'
+                  'show_all'
+                  'status'
               """)
         exit()
 
@@ -558,15 +563,22 @@ if  __name__ == '__main__':
     
     def clean_tags(tags): 
         #import pdb;pdb.set_trace()
-        tags = tags.replace(".",",")
-        tags = tags.replace(" ,",",")
+        tags = tags.replace(".",",")    # remove spaces and
+        tags = tags.replace(" ,",",")   # double ,, from string
         tags = tags.replace(", ",",")
         tags = tags.replace(",,",",")
-        while tags.startswith(" "):
+        while tags.startswith(" "):     # remove space from begining
             tags = tags[1:]
-        while tags.endswith(","):
+        while tags.endswith(","):       # and from end of line
             tags = tags[:-1]
-        # pop,firct i sprawdz czy istnieje i dodaj jesli nie
+        # remove same tags
+        tags = tags.split(",")
+        clean_tags = []
+        while tags:
+            tag = tags.pop(0)
+            if tag not in clean_tags:
+                clean_tags.append(tag)
+        tags = ",".join(clean_tags)
         return tags
 
     def update_path():
@@ -708,13 +720,16 @@ if  __name__ == '__main__':
         get_by_path("in_path")
     elif (command == "stat_dir"):
         get_by_path("stat_dir")
-    elif (command == "my_tags"):
+    elif (command == "status"):
         db.get_all_tags(table)
+        print("Records in db:",db.count_all(table))
     elif (command == "show_all"):
         result = db.query_all(table)
         show_result(result)
 
-    else: print("No.Such command", sys.argv[1]); exit()
+    else:
+        print("No.Such command", sys.argv[1])
+        print_usage()
     
     printerr("\noperation started at:  ",datetime.fromtimestamp(start))
     finish = time.time()
