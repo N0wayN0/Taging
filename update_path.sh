@@ -2,6 +2,7 @@
 
 # this script will update paths of all files in PWD
 
+depth=1
 echo "arg0: $0"
 echo "arg1: $1"
 
@@ -12,9 +13,9 @@ else
     dir="$1"
 fi
 
-list=$(find "$dir" -maxdepth 1 -type f  ) # | xargs realpath)
+list=$(find "$dir" -maxdepth $depth -type f) # | xargs realpath)
 #list=echo "$list" | tr "\n" " "
-#echo "$list" 
+echo "$list" 
 
 tagi.py update_path "$list"
 

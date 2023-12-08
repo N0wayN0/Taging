@@ -546,9 +546,10 @@ if  __name__ == '__main__':
             with file:
                 return file.read()
         if not os.path.isfile(file):
-            import pdb;pdb.set_trace()
-            printerr("File not exists. Exit")
-            exit()
+            #import pdb;pdb.set_trace()
+            printerr("File not exists")
+            printerr(file)
+            return
         return hashlib.md5(file_as_bytes(open(file, 'rb'))).hexdigest()
 
     command = sys.argv[1]
@@ -569,6 +570,8 @@ if  __name__ == '__main__':
         tags = tags.replace(",,",",")
         while tags.startswith(" "):     # remove space from begining
             tags = tags[1:]
+        while tags.startswith(","):     # remove , from begining
+            tags = tags[1:]
         while tags.endswith(","):       # and from end of line
             tags = tags[:-1]
         # remove same tags
@@ -583,23 +586,25 @@ if  __name__ == '__main__':
 
     def update_path():
         if (len(sys.argv) <= 2 ): print_usage()
+        #import pdb;pdb.set_trace()
         files = sys.argv[2:]
         files = files[0].split("\n")
         for plik in files:
             filepath = os.path.realpath(plik)
             hash = get_md5sum(filepath)
             #printerr("-->",hash,filepath)
-            result = db.query_one(table,{'hash':hash})
-            #import pdb;pdb.set_trace()
-            if result:
-                if result[0][1] != filepath:
-                    #import pdb;pdb.set_trace()
-                    row = {}
-                    row["hash"] = hash          # potrzeby do znalezienia rekordu
-                    row["path"] = filepath      # nowa sciezka
-                    db.update_by_hash(table, row)   # tagi zostana nie zmienione
-                    printerr("Old path", result[0][1])
-                    printerr("Updated path", filepath)
+            if hash:
+                result = db.query_one(table,{'hash':hash})
+                #import pdb;pdb.set_trace()
+                if result:
+                    if result[0][1] != filepath:
+                        #import pdb;pdb.set_trace()
+                        row = {}
+                        row["hash"] = hash          # potrzeby do znalezienia rekordu
+                        row["path"] = filepath      # nowa sciezka
+                        db.update_by_hash(table, row)   # tagi zostana nie zmienione
+                        printerr("Old path", result[0][1])
+                        printerr("Updated path", filepath)
 
     def insert_update_add():
         #import pdb;pdb.set_trace()
@@ -607,6 +612,7 @@ if  __name__ == '__main__':
         filepath = os.path.realpath(sys.argv[2])
         tags = sys.argv[3:]
         hash = get_md5sum(filepath)
+        if not hash: exit()
         #import pdb;pdb.set_trace()
         tags = ",".join(tags)
         row = {}
