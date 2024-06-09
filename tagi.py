@@ -1,4 +1,5 @@
-#!/bin/python3
+#!/usr/bin/python3.7m
+###!/bin/python3
 
 
 """ taging system
@@ -577,8 +578,10 @@ if  __name__ == '__main__':
         # remove same tags
         tags = tags.split(",")
         clean_tags = []
-        while tags:
+        while tags:                     # remove duplicated tags
             tag = tags.pop(0)
+            if tag.startswith("-"):     # and tags with -
+                continue
             if tag not in clean_tags:
                 clean_tags.append(tag)
         tags = ",".join(clean_tags)
@@ -708,6 +711,7 @@ if  __name__ == '__main__':
         db.del_by_path(table,{'path':filepath})
         # nie wazne czy rekord istnieje nie bedzie errora ani rezultatu
 
+    printerr("command:",command)
     if (command == "update"):
         insert_update_add()
     elif (command == "insert"):
