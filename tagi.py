@@ -153,10 +153,13 @@ class Database:
 
             result = {key: value for key, value in sorted(numbers.items())}
             #import pdb;pdb.set_trace()
-            print(result)
-            print("--------------------- STATUS ---------------------")
-            print("ALL tags:",all_tags)
-            print("Unique tags:",len(result))
+            for key in result:
+                #print(key, result[key])
+                print(key)
+            #print(result)
+            printerr("--------------------- STATUS ---------------------")
+            printerr("ALL tags:",all_tags)
+            printerr("Unique tags:",len(result))
         else:
             return ('no such table',)
 
@@ -522,6 +525,8 @@ if  __name__ == '__main__':
                   'remove'  '/path/to/file'
                   'show_all'
                   'status'
+
+                  -tag      'remove given tag'
               """)
         exit()
 
@@ -578,13 +583,20 @@ if  __name__ == '__main__':
         # remove same tags
         tags = tags.split(",")
         clean_tags = []
+        print("--------------check---------")
         while tags:                     # remove duplicated tags
             tag = tags.pop(0)
+            print(tag)
             if tag.startswith("-"):     # and tags with -
-                continue
-            if tag not in clean_tags:
+                #import pdb;pdb.set_trace()
+                tag = tag[1:]
+                if tag in clean_tags:
+                    clean_tags.remove(tag)
+                    print("remove",tag)
+            elif tag not in clean_tags:
                 clean_tags.append(tag)
         tags = ",".join(clean_tags)
+        print("--------------check---------")
         return tags
 
     def update_path():
@@ -627,11 +639,13 @@ if  __name__ == '__main__':
             printerr("Record exists", filepath, result[0][2]) #.split(','))
             if command == "add":
                 printerr("Adding tags", tags)
+                print("-----",row)
                 row["tags"] = result[0][2]+","+row["tags"]
-                row['tags'] = clean_tags(row['tags'])
+                #row['tags'] = clean_tags(row['tags'])
             else:
                 printerr("Do update", tags)
             row['tags'] = clean_tags(row['tags'])
+            print("----- clean tags",row)
             db.update_by_hash(table, row)
         else:
             printerr("Record not exists. Do insert")
@@ -732,7 +746,7 @@ if  __name__ == '__main__':
         get_by_path("stat_dir")
     elif (command == "status"):
         db.get_all_tags(table)
-        print("Records in db:",db.count_all(table))
+        printerr("Records in db:",db.count_all(table))
     elif (command == "show_all"):
         result = db.query_all(table)
         show_result(result)

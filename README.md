@@ -13,6 +13,9 @@ Usage:
     
     Add new tags to existing file:
     $ add /path/to/file new_tags
+
+    To remove same tag in multiple files:
+    Just add '-' in front of -tag
     
     
 ##Search
