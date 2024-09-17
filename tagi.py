@@ -1,4 +1,4 @@
-#!/usr/bin/python3.7m
+#!/usr/bin/python3
 ###!/bin/python3
 
 
